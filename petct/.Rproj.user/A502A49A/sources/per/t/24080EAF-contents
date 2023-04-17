@@ -1,0 +1,206 @@
+# ===============================================
+# Combining Datasets
+# ===============================================
+
+#' Copyright information:
+#' Author: Roxanne Beauclair, 2019, All rights reserved
+#' Content modification with permission: Larisse Bolton and James Azam, 2022
+#' Copyright: 2019 Roxanne Beauclair, All rights reserved
+
+
+# Description: In this script, we'll be examining how to create
+# complete datasets by combining multiple data frames together in 
+# different ways
+
+# ==============
+# Load packages
+# ==============
+
+library(tidyverse)
+library(nycflights13)
+
+
+# =====================
+# Load dataset
+# =====================
+
+airlines <- airlines # Lookup full carrier name from abbreviated code
+
+airports <- airports # information about each airport
+
+planes <- planes # information about each plane
+
+weather <- weather # weather at each NYC airport at each hour
+
+flights <- flights
+
+# ====================
+# Examine the datasets
+# ====================
+
+airlines
+
+# Each of the 16 airlines has its own 2-letter code stored
+# in the "carrier" variable
+
+airports
+
+# Each airport has its own code "faa"
+
+planes
+
+# Each plane is identified with the "tailnum" variable
+
+weather
+
+# Each row in the weather table is identified with a combination of
+# "origin", "year", "month", "day", "hour"
+
+flights
+
+# This table should look familiar. Each row looks like it represents a distinct 
+# flight and can maybe be uniquely identified with a combination of the 
+# "flight", "year", "month", "day", and "hour" variables. However, it is hard
+# to tell since there are so many rows
+
+# How can we connect the flight information to the information about planes?
+# How can we connect the flight information to the information about weather?
+# How can we connect the flight information to the information about airlines?
+# How can we connect the flight information to the information about airports?
+
+# =============================================================
+# Verify the key uniquely identifying each observation
+# =============================================================
+
+# Let's count the number of times our key occurs. If it uniquely
+# identifies a row, it should not occur more than once
+
+# For planes the key is tailnum
+n_planes <- count(planes, tailnum)
+
+n_planes
+
+# The count() function is also a dplyr helper function. It returns a
+# tibble, with a column called "n", which indicates the number of times
+# each tailnum occured
+
+filter(n_planes, n > 1)
+
+# It looks as though, each tailnum only occurs once, so this uniquely 
+# identifies each observation.
+
+# Now let's do this for the other tables
+
+n_airports <- count(airports, faa)
+filter(n_airports, n > 1)
+
+n_airlines <- count(airlines, carrier)
+filter(n_airlines, n > 1)
+
+n_weather <- count(weather, origin, year, month, day, hour)
+filter(n_weather, n > 1)
+
+n_flights <- count(flights, flight, tailnum, year, month, day, hour)
+filter(n_flights, n > 1)
+
+# What might it mean  that there are 2 of those combinations that have 
+# more than flight?
+
+# Let's try now by adding on "minute"
+n_flights <- count(flights, flight, tailnum, year, month, day, hour, minute)
+filter(n_flights, n > 1)
+
+# =============================================
+# Add the full airline name to the flights data
+# =============================================
+
+# First let's make the flights data smaller, since there are
+# extraneous variables we don't need
+
+flights1 <- select(flights, year:day, hour, origin, dest, tailnum, carrier)
+
+# We want to keep all of the flights from the flight dataset, but 
+# do not need any extra airlines that are not present in the flight data
+# So for this, let's use left_join()
+
+flights2 <- left_join(flights1, airlines, by = "carrier")
+flights2
+
+# Notice that in the left-hand df there were many of the same carriers,
+# and in the right-hand dataset there were only 1 of each carrier. This
+# is considered a m:1 relationship.
+
+# =============================================
+# Add the airports info to the flights data
+# for the destination
+# =============================================
+
+# The key in the flights dataset is destination. There are many of 
+# the same airport destinations in the flights data, but only one row for each
+# airport in the airports data. So this will be a many-to-one merge
+# Again, we want to keep all flights, whether or not there is a match, but we 
+# don't want to add any airports, if there are no flights using that airport.
+
+flights3 <- left_join(flights1, airports, by = c("dest" = "faa"))
+flights3
+
+# As you can see, the key can have a different name in each dataset
+# It matched the the dest variable in the flights2 data, to the faa
+# variable in the airports data
+
+# =============================================
+# How many flights use an airplane that do not 
+# have a match in the airplanes dataset?
+# =============================================
+
+# First let's return a table containing only observations
+# that do not have an airplane match in the airplanes dataset
+
+flights1
+planes
+
+no_match <- anti_join(flights1, planes, by = "tailnum")
+no_match
+
+# How many per airplane?
+n_no_match <- count(no_match, tailnum)
+n_no_match
+
+# =================
+# Practice problems
+# =================
+
+# 1.Join the airport data to the weather data? Is the relationship 1:m, m:1,
+# m:m, or 1:1?
+# HINT: View(airports) to have a quick look at all of the airport codes
+##The relationship is likely to be m:1
+View(airports)
+View(weather)
+n_airport <- count(airports, faa) %>% 
+  filter(n > 1)
+n_airport
+airport1 <- left_join(weather, airports, by = c("origin" = "faa"))
+
+
+# 2.Create a table that only has flights with planes that have flown at least
+# 200 flights
+no_flight <- count(flights, tailnum)
+no_flight
+
+# 3. The mtcars dataset is another built-in dataset available to you in R.
+# Load it in, and create two separate tables, one where "gear" is 
+# equal to 5 and one where "gear" is equal to 3. Then append them 
+# together using bind_rows()
+three <- filter(mtcars, gear == 3)
+five <- filter(mtcars, gear == 5)
+
+eight <- bind_rows(three, five)
+eight
+# ==============
+# Closing down
+# ==============
+
+rm(list = ls())
+
+detach(package: tidyverse)
+detach(package: nycflights13)
